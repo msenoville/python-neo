@@ -85,7 +85,7 @@ class NWBIO(BaseIO):
         BaseIO.__init__(self, filename=filename)
         self.filename = filename
         io = pynwb.NWBHDF5IO(self.filename, mode='r') # Open a file with NWBHDF5IO
-        self._file = io.read() # Define the file as a NWBFile object
+        self._file = io.read_builder() # Define the file as a NWBFile object
 
 
     def read_block(self, lazy=False, cascade=True, **kwargs):
@@ -114,6 +114,7 @@ class NWBIO(BaseIO):
             self._handle_analysis_group(block)
         self._lazy = False
         return block
+        # ok pour recup block ( desc , time , etc) 
 
 
     def write_block(self, block, **kwargs):
@@ -123,7 +124,7 @@ class NWBIO(BaseIO):
                              identifier=self._file.name,
                              )
         for segment in block.segments:
-            self._write_segment(segment)
+            self._write_segment(segment)        #PB:  il dit que block n'a pas de segment (renvoie plus bas)
         self._file.close()
 
         if block.file_origin is None:
@@ -137,6 +138,7 @@ class NWBIO(BaseIO):
         else:
             block.file_datetime = parse_datetime(nwb_create_date[0])
         self._file.close()
+        # pb: 
 
 
     def _handle_general_group(self, block):
