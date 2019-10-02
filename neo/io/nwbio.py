@@ -78,7 +78,7 @@ class NWBIO(BaseIO):
     """
 
     supported_objects = [Block, Segment, AnalogSignal, IrregularlySampledSignal,
-                         SpikeTrain, Epoch, Event]
+                         SpikeTrain, Epoch, Event] # maybe to remove at the end : already declared in neo.core.objectlist
     readable_objects  = supported_objects
     writeable_objects = supported_objects
 
@@ -125,9 +125,9 @@ class NWBIO(BaseIO):
         print("block in read_block = ", block)
 #        print("block.file_origin = ", block.file_origin)
         print("   ")        
-        # if cascade:
+        if cascade:
         #     self._handle_general_group(block)
-        #     self._handle_epochs_group(lazy, block)
+            self._handle_epochs_group(lazy, block)
         #     self._handle_acquisition_group(lazy, block)
         #     self._handle_stimulus_group(lazy, block)
         #     self._handle_processing_group(block)
@@ -136,52 +136,51 @@ class NWBIO(BaseIO):
         return block
 
 
-    def write_block(self, block, **kwargs):
-        start_time = datetime.now()
-#        print("00000000000 self._file = ", self._file)
-#        print("self.filename = ", self.filename)
->>>>>>> 9c10d7f6dbe6a719d903ec1b04712f901d5fe6ff
+#     def write_block(self, block, **kwargs):
+#         start_time = datetime.now()
+# #        print("00000000000 self._file = ", self._file)
+# #        print("self.filename = ", self.filename)
 
-# #        self._file = NWBFile(
-# #                             session_description='',
-# #                             #self.filename,
-# #                             session_start_time=start_time,
-# #                             identifier=self._file.name,
-# #                             )
-
-
-        ######
-        # NWB Epochs
-        for i in self._file.acquisition:
-            data = self._file.get_acquisition(i).data
-            unit = self._file.get_acquisition(i).unit
-            name = self._file.get_acquisition(i).name
-            comments = self._file.get_acquisition(i).comments
-            timestamps = self._file.get_acquisition(i).rate
-            start_time = self._file.get_acquisition(i).starting_time
-
-        nwb_timeseries = TimeSeries(name=name, data=data, unit=unit, timestamps=[timestamps])
-        nwb_epoch = self._file.add_epoch(start_time, 4.0, [comments], [nwb_timeseries, ]) ### Check 4.0 !
-#        print("nwb_epoch = ", nwb_epoch)
+# # #        self._file = NWBFile(
+# # #                             session_description='',
+# # #                             #self.filename,
+# # #                             session_start_time=start_time,
+# # #                             identifier=self._file.name,
+# # #                             )
 
 
-        segments = self._file.epochs[0]
-#        print("123123123123 segments = ", segments)
+#         ######
+#         # NWB Epochs
+#         for i in self._file.acquisition:
+#             data = self._file.get_acquisition(i).data
+#             unit = self._file.get_acquisition(i).unit
+#             name = self._file.get_acquisition(i).name
+#             comments = self._file.get_acquisition(i).comments
+#             timestamps = self._file.get_acquisition(i).rate
+#             start_time = self._file.get_acquisition(i).starting_time
 
-        block = self.read_block(block)
-#        print("block write = ", block)
-        block.segments.append(block)
-        print("****block.segments 123 = ", block.segments)
+#         nwb_timeseries = TimeSeries(name=name, data=data, unit=unit, timestamps=[timestamps])
+#         nwb_epoch = self._file.add_epoch(start_time, 4.0, [comments], [nwb_timeseries, ]) ### Check 4.0 !
+# #        print("nwb_epoch = ", nwb_epoch)
 
-        for segment in block.segments:
-            print("****** ok ******")
-#            print("segment = ", segment)
-            print("block.segments = ", block.segments)
-            print("segments = ", segments)
-            self._write_segment(segment)
-            print("*** end write_block ***")
-#        io.close()
-###        self._file.close()
+
+#         segments = self._file.epochs[0]
+# #        print("123123123123 segments = ", segments)
+
+#         block = self.read_block(block)
+# #        print("block write = ", block)
+#         block.segments.append(block)
+#         print("****block.segments 123 = ", block.segments)
+
+#         for segment in block.segments:
+#             print("****** ok ******")
+# #            print("segment = ", segment)
+#             print("block.segments = ", block.segments)
+#             print("segments = ", segments)
+#             self._write_segment(segment)
+#             print("*** end write_block ***")
+# #        io.close()
+# ###        self._file.close()
 
 
 
@@ -200,46 +199,48 @@ class NWBIO(BaseIO):
 #        print("****block.segments epochs_group = ", block.segments)
 
         epochs = self._file.acquisition
-#        print("epochs = ", epochs)
+        print("epochs = ", epochs)
 
 #        print("self._file = ", self._file)
+        my_id = 0
+        for key in epochs:
+            if my_id is 0:
+                timeseries = []
+                current_shape = self._file.get_acquisition(key).data.shape[0] # sample number
+                times = np.zeros(current_shape)
+                for j in range(0, current_shape):
+                    times[j]=1./self._file.get_acquisition(key).rate*j+self._file.get_acquisition(key).starting_time
+                    if times[j] == self._file.get_acquisition(key).starting_time:
+                        t_start = times[j] * pq.second
+                    elif times[j]==times[-1]:
+                        t_stop = times[j] * pq.second
+                    else:
+                        timeseries.append(self._handle_timeseries(self._lazy, key, times[j]))
+                    segment = Segment(name=j)
+                for obj in timeseries:
+                    obj.segment = segment
+                    if isinstance(obj, AnalogSignal):
+                        #print("AnalogSignal")
+                        segment.analogsignals.append(obj)
+                    elif isinstance(obj, IrregularlySampledSignal):
+                        #print("IrregularlySampledSignal")
+                        segment.irregularlysampledsignals.append(obj)
+                    elif isinstance(obj, Event):
+                        #print("Event")
+                        segment.events.append(obj)
+                    elif isinstance(obj, Epoch):
+                        #print("Epoch")
+                        segment.epochs.append(obj)
+                segment.block = block
+                segment.times=times
 
-        for key in epochs:    
-            timeseries = []
-            current_shape = self._file.get_acquisition(key).data.shape[0] # sample number
-            times = np.zeros(current_shape)
-            for j in range(0, current_shape):
-                times[j]=1./self._file.get_acquisition(key).rate*j+self._file.get_acquisition(key).starting_time
-                if times[j] == self._file.get_acquisition(key).starting_time:
-                    t_start = times[j] * pq.second
-                elif times[j]==times[-1]:
-                    t_stop = times[j] * pq.second
-                else:
-                    timeseries.append(self._handle_timeseries(self._lazy, key, times[j]))
-                segment = Segment(name=j)
-            for obj in timeseries:
-                obj.segment = segment
-                if isinstance(obj, AnalogSignal):
-                    #print("AnalogSignal")
-                    segment.analogsignals.append(obj)
-                elif isinstance(obj, IrregularlySampledSignal):
-                    #print("IrregularlySampledSignal")
-                    segment.irregularlysampledsignals.append(obj)
-                elif isinstance(obj, Event):
-                    #print("Event")
-                    segment.events.append(obj)
-                elif isinstance(obj, Epoch):
-                    #print("Epoch")
-                    segment.epochs.append(obj)
-            segment.block = block
-            segment.times=times
-
-#            print("segment.block = ", segment.block)
-#            print("block = ", block)
-#            print("segment = ", segment)
-#            print("segments = ", segments)
-#            block.segments.append(segment)
-            return segment, obj, times
+    #            print("segment.block = ", segment.block)
+    #            print("block = ", block)
+    #            print("segment = ", segment)
+    #            print("segments = ", segments)
+    #            block.segments.append(segment)
+                my_id = 1
+                return segment, obj, times
 
 
 
