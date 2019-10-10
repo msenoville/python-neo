@@ -251,6 +251,7 @@ from neo.io.neuroscopeio import NeuroScopeIO
 from neo.io.nixio import NixIO
 from neo.io.nixio_fr import NixIO as NixIOFr
 from neo.io.nsdfio import NSDFIO
+from neo.io.nwbio import NWBIO
 from neo.io.openephysio import OpenEphysIO
 from neo.io.pickleio import PickleIO
 from neo.io.plexonio import PlexonIO
@@ -291,6 +292,7 @@ iolist = [
     NeuroScopeIO,
     NeuroshareIO,
     NSDFIO,
+    NWBIO,
     OpenEphysIO,
     PickleIO,
     PlexonIO,

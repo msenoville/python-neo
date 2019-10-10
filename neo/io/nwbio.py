@@ -18,11 +18,6 @@ Sample datasets from Allen Institute - http://alleninstitute.github.io/AllenSDK/
 from __future__ import absolute_import
 
 import logging
-# from __future__ import division
-# from itertools import chain
-# import shutil
-# import tempfile
-# from datetime import datetime
 from os.path import join
 import dateutil.parser
 import numpy as np
@@ -42,39 +37,11 @@ from neo.core.baseneo import MergeError
 
 logger = logging.getLogger('Neo')
 
-
-# neo imports
-# from collections import OrderedDict
-
-# Standard Python imports
-# from tempfile import NamedTemporaryFile
-# import os
-# import glo
-# from scipy.io import loadmat
-
-# PyNWB imports
-# import pynwb
-# from pynwb import *
-# # Creating and writing NWB files
-# from pynwb import NWBFile,TimeSeries, get_manager
-# from pynwb.base import ProcessingModule
-# # Creating TimeSeries
-# from pynwb.ecephys import ElectricalSeries, Device, EventDetection
-# from pynwb.behavior import SpatialSeries
-# from pynwb.image import ImageSeries
-# from pynwb.core import set_parents
-# # For Neurodata Type Specifications
-# from pynwb.spec import NWBAttributeSpec # Attribute Specifications
-# from pynwb.spec import NWBDatasetSpec # Dataset Specifications
-# from pynwb.spec import NWBGroupSpec
-# from pynwb.spec import NWBNamespace
-
-
 class NWBIO(BaseIO):
     """
     Class for reading experimental data from a NWB format file.
 
-    Writing to NWB is not supported by this IO
+    Writing to NWB is not yet supported by this IO
     """
 
     supported_objects = [Block, Segment, AnalogSignal, IrregularlySampledSignal,
@@ -106,7 +73,35 @@ class NWBIO(BaseIO):
             io = pynwb.NWBHDF5IO(self.filename, mode='r') # Open a file with NWBHDF5IO
             self._file = io.read() # Define the file as a NWBFile object
 
-    def read_block(self, lazy=False, cascade=True, **kwargs):
+    def read_all_blocks(self, lazy=False, merge_singles=True, **kargs):
+        """
+        Loads all blocks in the file that are attached to the root (which
+        happens when they are saved with save() or write_block()).
+
+        If `merge_singles` is True, then the IO will attempt to merge single channel
+         `AnalogSignal` objects into multichannel objects, and similarly for single `Epoch`,
+         `Event` and `IrregularlySampledSignal` objects.
+        """
+        assert not lazy, 'Do not support lazy'
+
+        self.merge_singles = merge_singles
+
+        blocks = []
+        for node in self._file.acquisition:
+        # for name, node in self._file.items():
+            # print(name, node)
+            # if "Block" in name:
+            blocks.append(self._read_block(node))
+        return blocks
+
+    def read_block(self, lazy=False, **kargs):
+        """
+        Load the first block in the file.
+        """
+        assert not lazy, 'Do not support lazy'
+        return self.read_all_blocks(lazy=lazy)[0]
+
+    def _read_block(self, node, lazy=False, cascade=True, **kwargs):
         self._lazy = lazy
         file_access_dates = self._file.file_create_date
         identifier = self._file.identifier # or experimenter ?
@@ -123,12 +118,12 @@ class NWBIO(BaseIO):
                       file_access_dates=file_access_dates,
                       file_read_log='')
         if cascade:
-            self._handle_general_group(block)
-            self._handle_epochs_group(lazy, block)
-            self._handle_acquisition_group(lazy, block)
-            self._handle_stimulus_group(lazy, block)
-            self._handle_processing_group(block)
-            self._handle_analysis_group(block)
+            # self._handle_general_group(block)
+            self._handle_epochs_group(node, lazy, block)
+            # self._handle_acquisition_group(lazy, block)
+            # self._handle_stimulus_group(lazy, block)
+            # self._handle_processing_group(block)
+            # self._handle_analysis_group(block)
         self._lazy = False
         return block
 
@@ -185,50 +180,53 @@ class NWBIO(BaseIO):
     def _handle_general_group(self, block):
         pass
 
-    def _handle_epochs_group(self, lazy, block):
+    def _handle_epochs_group(self, node, lazy, block):
         # Note that an NWB Epoch corresponds to a Neo Segment, not to a Neo Epoch.
         self._lazy = lazy
-        epochs = self._file.acquisition
-        for key in epochs:
-            if my_id is 0:
-                timeseries = []
-                current_shape = self._file.get_acquisition(key).data.shape[0] # sample number
-                times = np.zeros(current_shape)
-                for j in range(0, current_shape):
-                    times[j]=1./self._file.get_acquisition(key).rate*j+self._file.get_acquisition(key).starting_time
-                    if times[j] == self._file.get_acquisition(key).starting_time:
-                        t_start = times[j] * pq.second
-                    elif times[j]==times[-1]:
-                        t_stop = times[j] * pq.second
-                    else:
-                        timeseries.append(self._handle_timeseries(self._lazy, key, times[j]))
-                    segment = Segment(name=j)
-                for obj in timeseries:
-                    obj.segment = segment
-                    if isinstance(obj, AnalogSignal):
-                        #print("AnalogSignal")
-                        segment.analogsignals.append(obj)
-                    elif isinstance(obj, IrregularlySampledSignal):
-                        #print("IrregularlySampledSignal")
-                        segment.irregularlysampledsignals.append(obj)
-                    elif isinstance(obj, Event):
-                        #print("Event")
-                        segment.events.append(obj)
-                    elif isinstance(obj, Epoch):
-                        #print("Epoch")
-                        segment.epochs.append(obj)
-                segment.block = block
-                segment.times=times
+        print(node)
+        epochs = self._file.acquisition[node]
+        print(self._file.acquisition[node])
+        # for key in epochs:
+        key = node
+        timeseries = []
+        current_shape = self._file.get_acquisition(key).data.shape[0] # sample number
+        times = np.zeros(current_shape)
+        for j in range(0, current_shape):
+            print("in handle epoch",j)
+            times[j]=1./self._file.get_acquisition(key).rate*j+self._file.get_acquisition(key).starting_time
+            if times[j] == self._file.get_acquisition(key).starting_time:
+                t_start = times[j] * pq.second
+            elif times[j]==times[-1]:
+                t_stop = times[j] * pq.second
+            else:
+                print(node)
+                # timeseries.append(self._handle_timeseries(self._lazy, key, times[j]))
+            segment = Segment(name=j)
+#         for obj in timeseries:
+#             obj.segment = segment
+#             if isinstance(obj, AnalogSignal):
+#                 #print("AnalogSignal")
+#                 segment.analogsignals.append(obj)
+#             elif isinstance(obj, IrregularlySampledSignal):
+#                 #print("IrregularlySampledSignal")
+#                 segment.irregularlysampledsignals.append(obj)
+#             elif isinstance(obj, Event):
+#                 #print("Event")
+#                 segment.events.append(obj)
+#             elif isinstance(obj, Epoch):
+#                 #print("Epoch")
+#                 segment.epochs.append(obj)
+#         segment.block = block
+#         segment.times=times
 
-    #            print("segment.block = ", segment.block)
-    #            print("block = ", block)
-    #            print("segment = ", segment)
-    #            print("segments = ", segments)
-    #            block.segments.append(segment)
-                my_id = 1
-                return segment, obj, times
+# #            print("segment.block = ", segment.block)
+# #            print("block = ", block)
+# #            print("segment = ", segment)
+# #            print("segments = ", segments)
+# #            block.segments.append(segment)
+#         return segment, obj, times
 
-    def _handle_timeseries(self, lazy, name, timeseries):
+    def _handle_timeseries(self,lazy, name, timeseries):
         for i in self._file.acquisition:
             data_group = self._file.get_acquisition(i).data*self._file.get_acquisition(i).conversion
             dtype = data_group.dtype
@@ -262,6 +260,7 @@ class NWBIO(BaseIO):
             current_shape = self._file.get_acquisition(i).data.shape[0] # number of samples
             times = np.zeros(current_shape)
             for j in range(0, current_shape):
+                print("in handle timseries", i, j)
                 times[j]=1./self._file.get_acquisition(i).rate*j+self._file.get_acquisition(i).starting_time
                 if times[j] == self._file.get_acquisition(i).starting_time:
                     sampling_metadata = times[j]
