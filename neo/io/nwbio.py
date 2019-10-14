@@ -187,21 +187,21 @@ class NWBIO(BaseIO):
         epochs = self._file.acquisition[node]
         print(self._file.acquisition[node])
         # for key in epochs:
-        key = node
+        key = node # maybe good to remove all keys or nodes for consistensy
         timeseries = []
         current_shape = self._file.get_acquisition(key).data.shape[0] # sample number
         times = np.zeros(current_shape)
         for j in range(0, current_shape):
             print("in handle epoch",j)
-            times[j]=1./self._file.get_acquisition(key).rate*j+self._file.get_acquisition(key).starting_time
-            if times[j] == self._file.get_acquisition(key).starting_time:
-                t_start = times[j] * pq.second
-            elif times[j]==times[-1]:
-                t_stop = times[j] * pq.second
+            # times[j]=1./self._file.get_acquisition(key).rate*j+self._file.get_acquisition(key).starting_time
+            # if times[j] == self._file.get_acquisition(key).starting_time:
+                # t_start = times[j] * pq.second
+            # elif times[j]==times[-1]:
+                # t_stop = times[j] * pq.second
             else:
                 print(node)
-                # timeseries.append(self._handle_timeseries(self._lazy, key, times[j]))
-            segment = Segment(name=j)
+                timeseries.append(self._handle_timeseries(self._lazy, key, times[j]))
+            # segment = Segment(name=j)
 #         for obj in timeseries:
 #             obj.segment = segment
 #             if isinstance(obj, AnalogSignal):
