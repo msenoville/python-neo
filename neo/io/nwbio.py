@@ -190,17 +190,18 @@ class NWBIO(BaseIO):
         key = node # maybe good to remove all keys or nodes for consistensy
         timeseries = []
         current_shape = self._file.get_acquisition(key).data.shape[0] # sample number
-        times = np.zeros(current_shape)
-        for j in range(0, current_shape):
-            print("in handle epoch",j)
+        if current_shape is not 0:
+            times = np.zeros(current_shape)
+        # for j in range(0, current_shape):
+            # print("in handle epoch",j)
             # times[j]=1./self._file.get_acquisition(key).rate*j+self._file.get_acquisition(key).starting_time
             # if times[j] == self._file.get_acquisition(key).starting_time:
                 # t_start = times[j] * pq.second
             # elif times[j]==times[-1]:
                 # t_stop = times[j] * pq.second
-            else:
-                print(node)
-                timeseries.append(self._handle_timeseries(self._lazy, key, times[j]))
+            # else:
+                # print(node)
+            timeseries.append(self._handle_timeseries(self._lazy, key, times))
             # segment = Segment(name=j)
 #         for obj in timeseries:
 #             obj.segment = segment
@@ -226,62 +227,63 @@ class NWBIO(BaseIO):
 # #            block.segments.append(segment)
 #         return segment, obj, times
 
-    def _handle_timeseries(self,lazy, name, timeseries):
-        for i in self._file.acquisition:
-            data_group = self._file.get_acquisition(i).data*self._file.get_acquisition(i).conversion
-            dtype = data_group.dtype
-            if lazy==True:
-                data = np.array((), dtype=dtype)
-                lazy_shape = data_group.shape
-            else:
-                data = data_group
+    def _handle_timeseries(self, lazy, name, timeseries):
+        # for i in self._file.acquisition:
+        i = name
+        data_group = self._file.get_acquisition(i).data*self._file.get_acquisition(i).conversion
+        dtype = data_group.dtype
+        if lazy==True:
+            data = np.array((), dtype=dtype)
+            lazy_shape = data_group.shape
+        else:
+            data = data_group
 
-            if dtype.type is np.string_:
-                if self._lazy:
-                    times = np.array(())
-                else:
-                    times = self._file.get_acquisition(i).timestamps
-                duration = 1/self._file.get_acquisition(i).rate
-                if durations:
-                    # Epoch
-                    if self._lazy:
-                        durations = np.array(())
-                    obj = Epoch(times=times,
-                                durations=durations,
-                                labels=data_group,
-                                units='second')
-                else:
-                    # Event
-                    obj = Event(times=times,
-                                labels=data_group,
-                                units='second')
+        if dtype.type is np.string_:
+            if self._lazy:
+                times = np.array(())
             else:
-                units = self._file.get_acquisition(i).unit
-            current_shape = self._file.get_acquisition(i).data.shape[0] # number of samples
-            times = np.zeros(current_shape)
-            for j in range(0, current_shape):
-                print("in handle timseries", i, j)
-                times[j]=1./self._file.get_acquisition(i).rate*j+self._file.get_acquisition(i).starting_time
-                if times[j] == self._file.get_acquisition(i).starting_time:
-                    sampling_metadata = times[j]
-                    t_start = sampling_metadata * pq.s
-                    sampling_rate = self._file.get_acquisition(i).rate * pq.Hz
-                    obj = AnalogSignal(
-                                       data_group,
-                                       units=units,
-                                       sampling_rate=sampling_rate,
-                                       t_start=t_start,
-                                       name=name)
-                elif self._file.get_acquisition(i).timestamps:
-                    if self._lazy:
-                        time_data = np.array(())
-                    else:
-                        time_data = self._file.get_acquisition(i).timestamps
-                    obj = IrregularlySampledSignal(
-                                                data_group,
-                                                units=units,
-                                                time_units=pq.second)
-            return obj
+                times = self._file.get_acquisition(i).timestamps
+            duration = 1/self._file.get_acquisition(i).rate
+            if durations:
+                # Epoch
+                if self._lazy:
+                    durations = np.array(())
+                obj = Epoch(times=times,
+                            durations=durations,
+                            labels=data_group,
+                            units='second')
+            else:
+                # Event
+                obj = Event(times=times,
+                            labels=data_group,
+                            units='second')
+        else:
+            units = self._file.get_acquisition(i).unit
+        current_shape = self._file.get_acquisition(i).data.shape[0] # number of samples
+        times = np.zeros(current_shape)
+        for j in range(0, current_shape):
+            print("in handle timseries", i, j)
+            times[j]=1./self._file.get_acquisition(i).rate*j+self._file.get_acquisition(i).starting_time
+            if times[j] == self._file.get_acquisition(i).starting_time:
+                sampling_metadata = times[j]
+                t_start = sampling_metadata * pq.s
+                sampling_rate = self._file.get_acquisition(i).rate * pq.Hz
+                obj = AnalogSignal(
+                                    data_group,
+                                    units=units,
+                                    sampling_rate=sampling_rate,
+                                    t_start=t_start,
+                                    name=name)
+            elif self._file.get_acquisition(i).timestamps:
+                if self._lazy:
+                    time_data = np.array(())
+                else:
+                    time_data = self._file.get_acquisition(i).timestamps
+                obj = IrregularlySampledSignal(
+                                            data_group,
+                                            units=units,
+                                            time_units=pq.second)
+        return obj
 
     def _handle_acquisition_group(self, lazy, block):
         acq = self._file.acquisition
